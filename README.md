@@ -17,6 +17,13 @@ MINIFLUX_TTS_OPENAI_API_KEY=... \
 go run ./cmd/miniflux-tts
 ```
 
+Or build/run the Nix package:
+
+```sh
+nix build .#miniflux-tts
+nix run .#miniflux-tts
+```
+
 For local tests, use the fake provider:
 
 ```sh
