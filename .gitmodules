@@ -1,3 +1,3 @@
 [submodule "v2"]
 	path = v2
-	url = git@github.com:xinyangli/miniflux-v2.git
+	url = https://github.com/xinyangli/miniflux-v2.git
