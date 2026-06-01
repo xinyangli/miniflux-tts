@@ -7,34 +7,38 @@ import (
 )
 
 type Config struct {
-	Addr             string
-	MinifluxBaseURL  string
-	MinifluxAPIToken string
-	PublicBaseURL    string
-	StorageDir       string
-	AllowedOrigin    string
-	BrowserToken     string
-	Provider         string
-	OpenAIAPIKey     string
-	OpenAIBaseURL    string
-	OpenAIModel      string
-	OpenAIVoice      string
+	Addr               string
+	MinifluxBaseURL    string
+	MinifluxAPIToken   string
+	PublicBaseURL      string
+	StorageDir         string
+	AllowedOrigin      string
+	BrowserToken       string
+	Provider           string
+	OpenAIAPIKey       string
+	OpenAIBaseURL      string
+	OpenAIModel        string
+	OpenAIVoice        string
+	OpenAIFormat       string
+	OpenAIInstructions string
 }
 
 func ConfigFromEnv() Config {
 	return Config{
-		Addr:             envOrDefault("TTS_ADDR", ":8090"),
-		MinifluxBaseURL:  os.Getenv("MINIFLUX_BASE_URL"),
-		MinifluxAPIToken: os.Getenv("MINIFLUX_API_TOKEN"),
-		PublicBaseURL:    strings.TrimRight(envOrDefault("PUBLIC_BASE_URL", "http://localhost:8090"), "/"),
-		StorageDir:       envOrDefault("STORAGE_DIR", "data/audio"),
-		AllowedOrigin:    os.Getenv("ALLOWED_MINIFLUX_ORIGIN"),
-		BrowserToken:     os.Getenv("TTS_BROWSER_TOKEN"),
-		Provider:         envOrDefault("MINIFLUX_TTS_PROVIDER", "openai"),
-		OpenAIAPIKey:     os.Getenv("MINIFLUX_TTS_OPENAI_API_KEY"),
-		OpenAIBaseURL:    strings.TrimRight(envOrDefault("MINIFLUX_TTS_OPENAI_BASE_URL", "https://api.openai.com/v1"), "/"),
-		OpenAIModel:      envOrDefault("MINIFLUX_TTS_OPENAI_MODEL", "gpt-4o-mini-tts"),
-		OpenAIVoice:      envOrDefault("MINIFLUX_TTS_OPENAI_VOICE", "alloy"),
+		Addr:               envOrDefault("TTS_ADDR", ":8090"),
+		MinifluxBaseURL:    os.Getenv("MINIFLUX_BASE_URL"),
+		MinifluxAPIToken:   os.Getenv("MINIFLUX_API_TOKEN"),
+		PublicBaseURL:      strings.TrimRight(envOrDefault("PUBLIC_BASE_URL", "http://localhost:8090"), "/"),
+		StorageDir:         envOrDefault("STORAGE_DIR", "data/audio"),
+		AllowedOrigin:      os.Getenv("ALLOWED_MINIFLUX_ORIGIN"),
+		BrowserToken:       os.Getenv("TTS_BROWSER_TOKEN"),
+		Provider:           envOrDefault("MINIFLUX_TTS_PROVIDER", "openai"),
+		OpenAIAPIKey:       os.Getenv("MINIFLUX_TTS_OPENAI_API_KEY"),
+		OpenAIBaseURL:      strings.TrimRight(envOrDefault("MINIFLUX_TTS_OPENAI_BASE_URL", "https://api.openai.com/v1"), "/"),
+		OpenAIModel:        envOrDefault("MINIFLUX_TTS_OPENAI_MODEL", "gpt-audio-1.5"),
+		OpenAIVoice:        envOrDefault("MINIFLUX_TTS_OPENAI_VOICE", "alloy"),
+		OpenAIFormat:       envOrDefault("MINIFLUX_TTS_OPENAI_FORMAT", "wav"),
+		OpenAIInstructions: envOrDefault("MINIFLUX_TTS_OPENAI_INSTRUCTIONS", "Read this article clearly and naturally."),
 	}
 }
 
@@ -60,6 +64,9 @@ func (c Config) Validate() error {
 		}
 		if c.OpenAIBaseURL == "" {
 			return errors.New("MINIFLUX_TTS_OPENAI_BASE_URL is required when MINIFLUX_TTS_PROVIDER=openai")
+		}
+		if c.OpenAIFormat == "" {
+			return errors.New("MINIFLUX_TTS_OPENAI_FORMAT is required when MINIFLUX_TTS_PROVIDER=openai")
 		}
 	default:
 		return errors.New("MINIFLUX_TTS_PROVIDER must be openai or fake")

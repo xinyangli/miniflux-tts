@@ -115,7 +115,7 @@ func TestGenerateRejectsInvalidBrowserToken(t *testing.T) {
 
 func TestAudioStoreServesSavedMP3(t *testing.T) {
 	store := AudioStore{Dir: t.TempDir(), PublicBaseURL: "http://tts.test"}
-	audioURL, _, err := store.Save(123, []byte("mp3"))
+	audioURL, _, err := store.Save(123, []byte("mp3"), "audio/mpeg")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,5 +132,27 @@ func TestAudioStoreServesSavedMP3(t *testing.T) {
 	}
 	if filepath.Base(strings.TrimPrefix(audioURL, "http://tts.test/audio/")) == "" {
 		t.Fatalf("expected generated filename in URL")
+	}
+}
+
+func TestAudioStoreServesSavedWAV(t *testing.T) {
+	store := AudioStore{Dir: t.TempDir(), PublicBaseURL: "http://tts.test"}
+	audioURL, _, err := store.Save(123, []byte("wav"), "audio/wav")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, strings.TrimPrefix(audioURL, "http://tts.test"), nil)
+	rec := httptest.NewRecorder()
+	store.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if rec.Header().Get("Content-Type") != "audio/wav" {
+		t.Fatalf("expected audio/wav content type, got %q", rec.Header().Get("Content-Type"))
+	}
+	if !strings.HasSuffix(audioURL, ".wav") {
+		t.Fatalf("expected wav URL, got %q", audioURL)
 	}
 }

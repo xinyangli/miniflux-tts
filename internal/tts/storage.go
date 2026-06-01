@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,7 +17,7 @@ type AudioStore struct {
 	PublicBaseURL string
 }
 
-func (s AudioStore) Save(entryID int64, audio []byte) (string, int64, error) {
+func (s AudioStore) Save(entryID int64, audio []byte, contentType string) (string, int64, error) {
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return "", 0, err
 	}
@@ -26,7 +27,7 @@ func (s AudioStore) Save(entryID int64, audio []byte) (string, int64, error) {
 		return "", 0, err
 	}
 
-	name := strconv.FormatInt(entryID, 10) + "-" + hex.EncodeToString(random) + ".mp3"
+	name := strconv.FormatInt(entryID, 10) + "-" + hex.EncodeToString(random) + audioExtension(contentType)
 	path := filepath.Join(s.Dir, name)
 	if err := os.WriteFile(path, audio, 0o644); err != nil {
 		return "", 0, err
@@ -37,7 +38,7 @@ func (s AudioStore) Save(entryID int64, audio []byte) (string, int64, error) {
 
 func (s AudioStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimPrefix(r.URL.Path, "/audio/")
-	if name == "" || name != filepath.Base(name) || !strings.HasSuffix(name, ".mp3") {
+	if name == "" || name != filepath.Base(name) || audioContentTypeForName(name) == "" {
 		http.NotFound(w, r)
 		return
 	}
@@ -56,6 +57,48 @@ func (s AudioStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "audio/mpeg")
+	w.Header().Set("Content-Type", audioContentTypeForName(name))
 	http.ServeContent(w, r, name, stat.ModTime(), file)
+}
+
+func audioExtension(contentType string) string {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return ".mp3"
+	}
+	switch mediaType {
+	case "audio/aac":
+		return ".aac"
+	case "audio/flac":
+		return ".flac"
+	case "audio/mpeg":
+		return ".mp3"
+	case "audio/opus":
+		return ".opus"
+	case "audio/pcm":
+		return ".pcm"
+	case "audio/wav", "audio/wave", "audio/x-wav":
+		return ".wav"
+	default:
+		return ".mp3"
+	}
+}
+
+func audioContentTypeForName(name string) string {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".aac":
+		return "audio/aac"
+	case ".flac":
+		return "audio/flac"
+	case ".mp3":
+		return "audio/mpeg"
+	case ".opus":
+		return "audio/opus"
+	case ".pcm":
+		return "audio/pcm"
+	case ".wav":
+		return "audio/wav"
+	default:
+		return ""
+	}
 }

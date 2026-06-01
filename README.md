@@ -17,6 +17,17 @@ MINIFLUX_TTS_OPENAI_API_KEY=... \
 go run ./cmd/miniflux-tts
 ```
 
+For OpenAI-compatible chat-completions TTS APIs:
+
+```sh
+MINIFLUX_TTS_OPENAI_API_KEY=... \
+MINIFLUX_TTS_OPENAI_BASE_URL=https://api.xiaomimimo.com/v1 \
+MINIFLUX_TTS_OPENAI_MODEL=mimo-v2.5-tts \
+MINIFLUX_TTS_OPENAI_VOICE=Chloe \
+MINIFLUX_TTS_OPENAI_FORMAT=wav \
+go run ./cmd/miniflux-tts
+```
+
 Or build/run the Nix package:
 
 ```sh

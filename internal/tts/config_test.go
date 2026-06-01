@@ -13,6 +13,7 @@ func TestConfigFromEnvOpenAIDefaults(t *testing.T) {
 	t.Setenv("MINIFLUX_TTS_OPENAI_BASE_URL", "")
 	t.Setenv("MINIFLUX_TTS_OPENAI_MODEL", "")
 	t.Setenv("MINIFLUX_TTS_OPENAI_VOICE", "")
+	t.Setenv("MINIFLUX_TTS_OPENAI_FORMAT", "")
 
 	config := ConfigFromEnv()
 	if config.Provider != "openai" {
@@ -21,11 +22,14 @@ func TestConfigFromEnvOpenAIDefaults(t *testing.T) {
 	if config.OpenAIBaseURL != "https://api.openai.com/v1" {
 		t.Fatalf("expected default OpenAI base URL, got %q", config.OpenAIBaseURL)
 	}
-	if config.OpenAIModel != "gpt-4o-mini-tts" {
+	if config.OpenAIModel != "gpt-audio-1.5" {
 		t.Fatalf("expected default OpenAI model, got %q", config.OpenAIModel)
 	}
 	if config.OpenAIVoice != "alloy" {
 		t.Fatalf("expected default OpenAI voice, got %q", config.OpenAIVoice)
+	}
+	if config.OpenAIFormat != "wav" {
+		t.Fatalf("expected default OpenAI format, got %q", config.OpenAIFormat)
 	}
 	if err := config.Validate(); err != nil {
 		t.Fatalf("expected valid config, got %v", err)
@@ -40,8 +44,9 @@ func TestConfigValidateMissingOpenAIAPIKey(t *testing.T) {
 		StorageDir:       "data/audio",
 		Provider:         "openai",
 		OpenAIBaseURL:    "https://api.openai.com/v1",
-		OpenAIModel:      "gpt-4o-mini-tts",
+		OpenAIModel:      "gpt-audio-1.5",
 		OpenAIVoice:      "alloy",
+		OpenAIFormat:     "wav",
 	}
 
 	err := config.Validate()
@@ -64,5 +69,23 @@ func TestConfigValidateFakeProviderBypassesOpenAIAPIKey(t *testing.T) {
 
 	if err := config.Validate(); err != nil {
 		t.Fatalf("expected fake provider config to bypass OpenAI key, got %v", err)
+	}
+}
+
+func TestConfigValidateOpenAICompatibleChatCompletions(t *testing.T) {
+	config := Config{
+		MinifluxBaseURL:  "http://miniflux.test",
+		MinifluxAPIToken: "mf-token",
+		PublicBaseURL:    "http://tts.test",
+		StorageDir:       "data/audio",
+		Provider:         "openai",
+		OpenAIAPIKey:     "openai-token",
+		OpenAIBaseURL:    "https://api.xiaomimimo.com/v1",
+		OpenAIModel:      "mimo-v2.5-tts",
+		OpenAIFormat:     "wav",
+	}
+
+	if err := config.Validate(); err != nil {
+		t.Fatalf("expected valid OpenAI-compatible chat completions config, got %v", err)
 	}
 }

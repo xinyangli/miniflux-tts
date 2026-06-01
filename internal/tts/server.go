@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"log"
 	"mime"
 	"net/http"
 	"regexp"
@@ -56,13 +57,13 @@ func (s *Server) handleOptions(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	if s.config.BrowserToken != "" && r.Header.Get("X-TTS-Token") != s.config.BrowserToken {
-		http.Error(w, "invalid TTS token", http.StatusUnauthorized)
+		s.writeError(w, r, http.StatusUnauthorized, "invalid TTS token", nil, 0)
 		return
 	}
 
 	entryID, err := strconv.ParseInt(r.PathValue("entryID"), 10, 64)
 	if err != nil || entryID <= 0 {
-		http.Error(w, "invalid entry ID", http.StatusBadRequest)
+		s.writeError(w, r, http.StatusBadRequest, "invalid entry ID", err, 0)
 		return
 	}
 
@@ -71,29 +72,42 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 
 	entry, err := s.client.EntryContext(ctx, entryID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("fetch entry: %v", err), http.StatusBadGateway)
+		s.writeError(w, r, http.StatusBadGateway, "fetch entry", err, entryID)
 		return
 	}
 
-	speech, err := s.backend.GenerateSpeech(ctx, SpeechRequest{Input: entryText(entry)})
+	input := entryText(entry)
+	speech, err := s.backend.GenerateSpeech(ctx, SpeechRequest{Input: input})
 	if err != nil {
-		http.Error(w, fmt.Sprintf("generate speech: %v", err), http.StatusBadGateway)
+		s.writeError(w, r, http.StatusBadGateway, "generate speech", err, entryID)
 		return
 	}
 
-	audioURL, size, err := s.store.Save(entryID, speech.Audio)
+	audioURL, size, err := s.store.Save(entryID, speech.Audio, speech.ContentType)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("store audio: %v", err), http.StatusInternalServerError)
+		s.writeError(w, r, http.StatusInternalServerError, "store audio", err, entryID)
 		return
 	}
 
 	enclosures := replaceTTSEnclosure(entry.Enclosures, audioURL, size, s.config.PublicBaseURL, speech.ContentType)
 	if _, err := s.client.UpdateEntryContext(ctx, entryID, &miniflux.EntryModificationRequest{Enclosures: &enclosures}); err != nil {
-		http.Error(w, fmt.Sprintf("update entry enclosures: %v", err), http.StatusBadGateway)
+		s.writeError(w, r, http.StatusBadGateway, "update entry enclosures", err, entryID)
 		return
 	}
 
+	log.Printf("tts generated entry_id=%d input_chars=%d audio_bytes=%d audio_url=%q", entryID, len([]rune(input)), len(speech.Audio), audioURL)
 	writeJSON(w, GenerateResponse{EntryID: entryID, URL: audioURL, Size: size})
+}
+
+func (s *Server) writeError(w http.ResponseWriter, r *http.Request, status int, message string, err error, entryID int64) {
+	if err != nil {
+		log.Printf("tts request failed status=%d method=%s path=%q entry_id=%d message=%q error=%v", status, r.Method, r.URL.Path, entryID, message, err)
+		http.Error(w, fmt.Sprintf("%s: %v", message, err), status)
+		return
+	}
+
+	log.Printf("tts request failed status=%d method=%s path=%q entry_id=%d message=%q", status, r.Method, r.URL.Path, entryID, message)
+	http.Error(w, message, status)
 }
 
 func (s *Server) withCORS(next http.Handler) http.Handler {
