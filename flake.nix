@@ -1,15 +1,23 @@
 {
   description = "Miniflux TTS integration workspace";
 
+  inputs.self.submodules = true;
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    { self, nixpkgs }:
     let
-      systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "aarch64-darwin"
+      ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
     in
     {
-      devShells = forAllSystems (pkgs:
+      devShells = forAllSystems (
+        pkgs:
         let
           go = if pkgs ? go_1_26 then pkgs.go_1_26 else pkgs.go;
         in
@@ -26,9 +34,11 @@
               pkgs.git
             ];
           };
-        });
+        }
+      );
 
-      packages = forAllSystems (pkgs:
+      packages = forAllSystems (
+        pkgs:
         let
           go = if pkgs ? go_1_26 then pkgs.go_1_26 else pkgs.go;
           buildGoModule = pkgs.buildGoModule.override { inherit go; };
@@ -52,12 +62,23 @@
         {
           default = miniflux-tts;
           miniflux-tts = miniflux-tts;
-        });
+        }
+      );
 
-      apps = forAllSystems (pkgs:
+      apps = forAllSystems (
+        pkgs:
         let
           go = if pkgs ? go_1_26 then pkgs.go_1_26 else pkgs.go;
-          env = "PATH=${pkgs.lib.makeBinPath [ go pkgs.postgresql pkgs.curl pkgs.jq pkgs.netcat pkgs.git ]}:$PATH";
+          env = "PATH=${
+            pkgs.lib.makeBinPath [
+              go
+              pkgs.postgresql
+              pkgs.curl
+              pkgs.jq
+              pkgs.netcat
+              pkgs.git
+            ]
+          }:$PATH";
           miniflux-tts = self.packages.${pkgs.system}.miniflux-tts;
         in
         {
@@ -73,33 +94,40 @@
 
           tts-test = {
             type = "app";
-            program = toString (pkgs.writeShellScript "tts-test" ''
-              set -eu
-              cd ${self}
-              ${env}
-              bash ./scripts/tts-test.sh
-            '');
+            program = toString (
+              pkgs.writeShellScript "tts-test" ''
+                set -eu
+                cd ${self}
+                ${env}
+                bash ./scripts/tts-test.sh
+              ''
+            );
           };
 
           miniflux-test = {
             type = "app";
-            program = toString (pkgs.writeShellScript "miniflux-test" ''
-              set -eu
-              cd ${self}
-              ${env}
-              bash ./scripts/miniflux-test.sh
-            '');
+            program = toString (
+              pkgs.writeShellScript "miniflux-test" ''
+                set -eu
+                cd ${self}
+                ${env}
+                bash ./scripts/miniflux-test.sh
+              ''
+            );
           };
 
           e2e-test = {
             type = "app";
-            program = toString (pkgs.writeShellScript "e2e-test" ''
-              set -eu
-              cd ${self}
-              ${env}
-              bash ./scripts/e2e-test.sh
-            '');
+            program = toString (
+              pkgs.writeShellScript "e2e-test" ''
+                set -eu
+                cd ${self}
+                ${env}
+                bash ./scripts/e2e-test.sh
+              ''
+            );
           };
-        });
+        }
+      );
     };
 }
