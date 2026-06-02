@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
-	"log"
+	"log/slog"
 	"mime"
 	"net/http"
 	"regexp"
@@ -65,6 +65,7 @@ func (s *Server) StartWorkers(ctx context.Context) {
 	}()
 	for i := 0; i < s.config.WorkerCount; i++ {
 		workerID := i + 1
+		slog.Info("tts worker starting", slog.Int("worker_id", workerID))
 		go s.runWorker(ctx, workerID)
 	}
 }
@@ -86,6 +87,7 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	status := s.queue.Enqueue(entryID)
+	slog.Info("tts job accepted", slog.Int64("entry_id", entryID), slog.String("status", string(status)))
 	writeJSONStatus(w, http.StatusAccepted, JobResponse{EntryID: entryID, Status: string(status)})
 }
 
@@ -104,6 +106,7 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
 
+	slog.Info("tts delete requested", slog.Int64("entry_id", entryID))
 	entry, err := s.client.EntryContext(ctx, entryID)
 	if err != nil {
 		s.writeError(w, r, http.StatusBadGateway, "fetch entry", err, entryID)
@@ -125,6 +128,7 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	slog.Info("tts delete completed", slog.Int64("entry_id", entryID), slog.Int("removed", len(removed)), slog.Int("kept", len(kept)))
 	writeJSON(w, DeleteResponse{EntryID: entryID, Removed: len(removed)})
 }
 
@@ -140,26 +144,28 @@ func (s *Server) runWorker(ctx context.Context, workerID int) {
 		if !ok {
 			return
 		}
+		slog.Info("tts worker dequeued", slog.Int("worker_id", workerID), slog.Int64("entry_id", entryID))
 		jobCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 		err := s.processJob(jobCtx, entryID)
 		cancel()
 		s.queue.Complete(entryID)
 		if err != nil {
-			log.Printf("tts worker failed worker_id=%d entry_id=%d error=%v", workerID, entryID, err)
+			slog.Error("tts worker failed", slog.Int("worker_id", workerID), slog.Int64("entry_id", entryID), slog.Any("error", err))
 			continue
 		}
-		log.Printf("tts worker completed worker_id=%d entry_id=%d", workerID, entryID)
+		slog.Info("tts worker completed", slog.Int("worker_id", workerID), slog.Int64("entry_id", entryID))
 	}
 }
 
 func (s *Server) processJob(ctx context.Context, entryID int64) error {
+	slog.Info("tts processing started", slog.Int64("entry_id", entryID))
 	entry, err := s.client.EntryContext(ctx, entryID)
 	if err != nil {
 		return fmt.Errorf("fetch entry: %w", err)
 	}
 
 	if hasTTSEnclosure(entry.Enclosures, s.config.PublicBaseURL) {
-		log.Printf("tts skip existing enclosure entry_id=%d", entryID)
+		slog.Info("tts processing skipped", slog.Int64("entry_id", entryID), slog.String("reason", "existing enclosure"))
 		return nil
 	}
 
@@ -179,18 +185,35 @@ func (s *Server) processJob(ctx context.Context, entryID int64) error {
 		return fmt.Errorf("update entry enclosures: %w", err)
 	}
 
-	log.Printf("tts generated entry_id=%d input_chars=%d audio_bytes=%d audio_url=%q", entryID, len([]rune(input)), len(speech.Audio), audioURL)
+	slog.Info("tts generated", slog.Int64("entry_id", entryID), slog.Int("input_chars", len([]rune(input))), slog.Int("audio_bytes", len(speech.Audio)), slog.String("audio_url", audioURL))
 	return nil
 }
 
 func (s *Server) writeError(w http.ResponseWriter, r *http.Request, status int, message string, err error, entryID int64) {
+	level := slog.LevelWarn
+	if status >= http.StatusInternalServerError {
+		level = slog.LevelError
+	}
 	if err != nil {
-		log.Printf("tts request failed status=%d method=%s path=%q entry_id=%d message=%q error=%v", status, r.Method, r.URL.Path, entryID, message, err)
+		slog.LogAttrs(r.Context(), level, "tts request failed",
+			slog.Int("status", status),
+			slog.String("method", r.Method),
+			slog.String("path", r.URL.Path),
+			slog.Int64("entry_id", entryID),
+			slog.String("message", message),
+			slog.Any("error", err),
+		)
 		http.Error(w, fmt.Sprintf("%s: %v", message, err), status)
 		return
 	}
 
-	log.Printf("tts request failed status=%d method=%s path=%q entry_id=%d message=%q", status, r.Method, r.URL.Path, entryID, message)
+	slog.LogAttrs(r.Context(), level, "tts request failed",
+		slog.Int("status", status),
+		slog.String("method", r.Method),
+		slog.String("path", r.URL.Path),
+		slog.Int64("entry_id", entryID),
+		slog.String("message", message),
+	)
 	http.Error(w, message, status)
 }
 
