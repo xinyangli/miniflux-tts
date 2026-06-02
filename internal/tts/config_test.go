@@ -31,8 +31,20 @@ func TestConfigFromEnvOpenAIDefaults(t *testing.T) {
 	if config.OpenAIFormat != "wav" {
 		t.Fatalf("expected default OpenAI format, got %q", config.OpenAIFormat)
 	}
+	if config.WorkerCount != 1 {
+		t.Fatalf("expected default worker count 1, got %d", config.WorkerCount)
+	}
 	if err := config.Validate(); err != nil {
 		t.Fatalf("expected valid config, got %v", err)
+	}
+}
+
+func TestConfigFromEnvWorkerCount(t *testing.T) {
+	t.Setenv("MINIFLUX_TTS_WORKER_COUNT", "3")
+
+	config := ConfigFromEnv()
+	if config.WorkerCount != 3 {
+		t.Fatalf("expected worker count 3, got %d", config.WorkerCount)
 	}
 }
 
@@ -47,6 +59,7 @@ func TestConfigValidateMissingOpenAIAPIKey(t *testing.T) {
 		OpenAIModel:      "gpt-audio-1.5",
 		OpenAIVoice:      "alloy",
 		OpenAIFormat:     "wav",
+		WorkerCount:      1,
 	}
 
 	err := config.Validate()
@@ -65,10 +78,30 @@ func TestConfigValidateFakeProviderBypassesOpenAIAPIKey(t *testing.T) {
 		PublicBaseURL:    "http://tts.test",
 		StorageDir:       "data/audio",
 		Provider:         "fake",
+		WorkerCount:      1,
 	}
 
 	if err := config.Validate(); err != nil {
 		t.Fatalf("expected fake provider config to bypass OpenAI key, got %v", err)
+	}
+}
+
+func TestConfigValidateInvalidWorkerCount(t *testing.T) {
+	config := Config{
+		MinifluxBaseURL:  "http://miniflux.test",
+		MinifluxAPIToken: "mf-token",
+		PublicBaseURL:    "http://tts.test",
+		StorageDir:       "data/audio",
+		Provider:         "fake",
+		WorkerCount:      0,
+	}
+
+	err := config.Validate()
+	if err == nil {
+		t.Fatal("expected invalid worker count error")
+	}
+	if !strings.Contains(err.Error(), "MINIFLUX_TTS_WORKER_COUNT") {
+		t.Fatalf("expected worker count error, got %v", err)
 	}
 }
 
@@ -83,6 +116,7 @@ func TestConfigValidateOpenAICompatibleChatCompletions(t *testing.T) {
 		OpenAIBaseURL:    "https://api.xiaomimimo.com/v1",
 		OpenAIModel:      "mimo-v2.5-tts",
 		OpenAIFormat:     "wav",
+		WorkerCount:      1,
 	}
 
 	if err := config.Validate(); err != nil {

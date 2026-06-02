@@ -3,6 +3,7 @@ package tts
 import (
 	"errors"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -21,6 +22,7 @@ type Config struct {
 	OpenAIVoice        string
 	OpenAIFormat       string
 	OpenAIInstructions string
+	WorkerCount        int
 }
 
 func ConfigFromEnv() Config {
@@ -39,6 +41,7 @@ func ConfigFromEnv() Config {
 		OpenAIVoice:        envOrDefault("MINIFLUX_TTS_OPENAI_VOICE", "alloy"),
 		OpenAIFormat:       envOrDefault("MINIFLUX_TTS_OPENAI_FORMAT", "wav"),
 		OpenAIInstructions: envOrDefault("MINIFLUX_TTS_OPENAI_INSTRUCTIONS", "Read this article clearly and naturally."),
+		WorkerCount:        envIntOrDefault("MINIFLUX_TTS_WORKER_COUNT", 1),
 	}
 }
 
@@ -54,6 +57,9 @@ func (c Config) Validate() error {
 	}
 	if c.StorageDir == "" {
 		return errors.New("STORAGE_DIR is required")
+	}
+	if c.WorkerCount < 1 {
+		return errors.New("MINIFLUX_TTS_WORKER_COUNT must be >= 1")
 	}
 	switch c.Provider {
 	case "fake":
@@ -79,4 +85,19 @@ func envOrDefault(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func envIntOrDefault(key string, fallback int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0
+	}
+	if parsed < 1 {
+		return parsed
+	}
+	return parsed
 }

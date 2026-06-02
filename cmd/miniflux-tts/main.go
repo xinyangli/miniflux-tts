@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -18,6 +19,7 @@ func main() {
 	}
 
 	server := tts.NewServer(config, backend)
+	server.StartWorkers(context.Background())
 	log.Printf("listening on %s", config.Addr)
 	log.Fatal(http.ListenAndServe(config.Addr, server.Handler()))
 }

@@ -36,6 +36,24 @@ func (s AudioStore) Save(entryID int64, audio []byte, contentType string) (strin
 	return strings.TrimRight(s.PublicBaseURL, "/") + "/audio/" + name, int64(len(audio)), nil
 }
 
+func (s AudioStore) DeleteURL(audioURL string) error {
+	prefix := strings.TrimRight(s.PublicBaseURL, "/") + "/audio/"
+	if !strings.HasPrefix(audioURL, prefix) {
+		return nil
+	}
+
+	name := strings.TrimPrefix(audioURL, prefix)
+	if name == "" || name != filepath.Base(name) || audioContentTypeForName(name) == "" {
+		return nil
+	}
+
+	err := os.Remove(filepath.Join(s.Dir, name))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 func (s AudioStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimPrefix(r.URL.Path, "/audio/")
 	if name == "" || name != filepath.Base(name) || audioContentTypeForName(name) == "" {
